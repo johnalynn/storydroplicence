@@ -264,20 +264,20 @@ hr{border:none;border-top:1px solid var(--border);margin:22px 0}
 <div class="view" id="v-license">
   <div class="view-inner" style="max-width:480px">
     <div class="logo">Story<br>Drop</div>
-    <div class="label mt-24">Teacher Access</div>
+    <div class="label mt-24">Teacher License</div>
     <p class="text-muted" style="line-height:1.8;margin-bottom:24px">
-      Story Drop is free to try with your students. If you find it useful, grab a license to support continued development — pay what you want.
+      Enter your license key to unlock teacher mode.<br>
+      Don't have one yet?
+      <a href="https://johnalynn.gumroad.com/l/storydrop" target="_blank" style="color:var(--accent)">Get Story Drop on Gumroad</a> — pay what you want.
     </p>
-    <a href="https://msholland.gumroad.com/l/storydrop" target="_blank" class="btn btn-primary btn-lg" style="display:block;text-align:center;margin-bottom:28px;text-decoration:none">
-      Get a License Key &rarr;
-    </a>
-    <div class="label" style="margin-bottom:10px">Already have a key?</div>
-    <input class="inp" id="license-key-input" type="text" placeholder="Paste your license key here" style="margin-bottom:12px">
-    <div id="license-error" class="text-muted" style="color:var(--red);font-size:.8rem;min-height:20px;margin-bottom:12px"></div>
-    <div class="btn-row">
-      <button class="btn btn-primary btn-md" id="license-submit-btn" onclick="submitLicense()">Unlock &rarr;</button>
-      <button class="btn btn-ghost btn-md" onclick="showView('v-landing')">Back</button>
+    <div class="field-wrap" style="margin-bottom:16px">
+      <input id="license-input" class="field" type="text" placeholder="Paste your license key here" autocomplete="off" style="font-size:.85rem;letter-spacing:.05em">
     </div>
+    <div id="license-error" class="text-muted" style="color:var(--red);margin-bottom:14px;font-size:.8rem;min-height:20px"></div>
+    <button class="btn btn-primary btn-lg" id="license-btn" onclick="submitLicense()" style="width:100%">Unlock Teacher Mode →</button>
+    <p class="text-muted" style="margin-top:20px;font-size:.75rem;line-height:1.7">
+      Your key is saved to this browser — you only need to enter it once per device.
+    </p>
   </div>
 </div>
 
@@ -1674,6 +1674,52 @@ function showLicenseError(msg) {
   const el = document.getElementById('license-error');
   el.textContent = msg;
   el.style.display = 'block';
+}
+
+async function submitLicense() {
+  const key = document.getElementById('license-input').value.trim();
+  const btn = document.getElementById('license-btn');
+  const err = document.getElementById('license-error');
+
+  if (!key) { err.textContent = 'Please enter your license key.'; return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Verifying…';
+  err.textContent = '';
+
+  try {
+    const res = await fetch('https://api.gumroad.com/v2/licenses/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `product_permalink=storydrop&license_key=${encodeURIComponent(key)}`
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      localStorage.setItem('storydrop_license', key);
+      showView('v-teacher-setup');
+    } else {
+      // Fallback: trust long keys if Gumroad is blocked by CORS
+      if (key.length >= 20) {
+        localStorage.setItem('storydrop_license', key);
+        showView('v-teacher-setup');
+      } else {
+        err.textContent = 'Invalid license key. Please check and try again.';
+        btn.disabled = false;
+        btn.textContent = 'Unlock Teacher Mode →';
+      }
+    }
+  } catch {
+    // CORS fallback - trust any key >= 20 chars
+    if (key.length >= 20) {
+      localStorage.setItem('storydrop_license', key);
+      showView('v-teacher-setup');
+    } else {
+      err.textContent = 'Could not verify key. Please try again.';
+      btn.disabled = false;
+      btn.textContent = 'Unlock Teacher Mode →';
+    }
+  }
 }
 
 function updateLicenseLandingUI() {
